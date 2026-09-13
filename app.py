@@ -114,7 +114,7 @@ def run_prediction(input_row: pd.DataFrame):
     return predicted_rul, predicted_risk, anomaly_status, anomaly_score
 
 
-def show_results(dataset, engine_id, cycle, predicted_rul, predicted_risk, anomaly_status, anomaly_score):
+def show_results(engine_id, cycle, predicted_rul, predicted_risk, anomaly_status, anomaly_score):
     st.subheader("Machine Health Results")
 
     col1, col2, col3, col4 = st.columns(4)
@@ -132,18 +132,11 @@ def show_results(dataset, engine_id, cycle, predicted_rul, predicted_risk, anoma
 
     st.subheader("Machine Summary")
     summary = pd.DataFrame({
-        "Parameter": ["Dataset", "Engine ID", "Current Cycle", "Predicted RUL", "Predicted Risk", "Anomaly Status"],
-        "Value": [dataset, engine_id, cycle, f"{predicted_rul:.2f} cycles", predicted_risk, anomaly_status],
+        "Parameter": ["Engine ID", "Current Cycle", "Predicted RUL", "Predicted Risk", "Anomaly Status"],
+        "Value": [engine_id, cycle, f"{predicted_rul:.2f} cycles", predicted_risk, anomaly_status],
     })
     st.table(summary)
 
-
-# ============================================
-# Sidebar
-# ============================================
-
-st.sidebar.header("Engine Information")
-dataset = st.sidebar.selectbox("Dataset", ["FD001", "FD002", "FD003", "FD004"])
 
 # ============================================
 # Input mode: CSV upload (recommended) or manual entry
@@ -159,7 +152,7 @@ with tab_csv:
         "(the models were trained on 5- and 20-cycle rolling windows)."
     )
 
-    template = pd.DataFrame({"engine_id": [f"{dataset}_1"] * 3, "cycle": [1, 2, 3]})
+    template = pd.DataFrame({"engine_id": ["engine_1"] * 3, "cycle": [1, 2, 3]})
     for s in sensor_columns:
         template[s] = 0.0
     st.download_button(
@@ -168,7 +161,10 @@ with tab_csv:
         file_name="sensor_readings_template.csv",
         mime="text/csv",
     )
-    st.caption("Including an `engine_id` column is optional — if present, it's read automatically instead of typing it.")
+    st.caption(
+        "Including an `engine_id` column is optional — if present, it's "
+        "read automatically instead of typing it below."
+    )
 
     uploaded_file = st.file_uploader("Sensor readings CSV", type=["csv"])
 
@@ -203,7 +199,7 @@ with tab_csv:
                 else:
                     engine_id = st.text_input(
                         "Engine ID (not found in CSV — enter manually)",
-                        value=f"{dataset}_1",
+                        value="engine_1",
                         key="csv_engine_id_fallback",
                     )
 
@@ -219,7 +215,7 @@ with tab_csv:
                     input_row = engineer_features(engine_data)
                     predicted_rul, predicted_risk, anomaly_status, anomaly_score = run_prediction(input_row)
                     show_results(
-                        dataset, engine_id, last_cycle,
+                        engine_id, last_cycle,
                         predicted_rul, predicted_risk, anomaly_status, anomaly_score,
                     )
 
@@ -231,7 +227,7 @@ with tab_manual:
         "for a full, more accurate analysis."
     )
 
-    engine_id = st.text_input("Engine ID", value=f"{dataset}_1", key="manual_engine_id")
+    engine_id = st.text_input("Engine ID", value="engine_1", key="manual_engine_id")
     cycle = st.number_input("Current Cycle", min_value=1, value=100, key="manual_cycle")
 
     sensor_values = {}
@@ -249,6 +245,6 @@ with tab_manual:
 
         predicted_rul, predicted_risk, anomaly_status, anomaly_score = run_prediction(input_row)
         show_results(
-            dataset, engine_id, cycle,
+            engine_id, cycle,
             predicted_rul, predicted_risk, anomaly_status, anomaly_score,
         )
