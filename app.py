@@ -144,7 +144,6 @@ def show_results(dataset, engine_id, cycle, predicted_rul, predicted_risk, anoma
 
 st.sidebar.header("Engine Information")
 dataset = st.sidebar.selectbox("Dataset", ["FD001", "FD002", "FD003", "FD004"])
-engine_id = st.sidebar.text_input("Engine ID", value=f"{dataset}_1")
 
 # ============================================
 # Input mode: CSV upload (recommended) or manual entry
@@ -160,7 +159,7 @@ with tab_csv:
         "(the models were trained on 5- and 20-cycle rolling windows)."
     )
 
-    template = pd.DataFrame({"cycle": [1, 2, 3]})
+    template = pd.DataFrame({"engine_id": [f"{dataset}_1"] * 3, "cycle": [1, 2, 3]})
     for s in sensor_columns:
         template[s] = 0.0
     st.download_button(
@@ -169,6 +168,7 @@ with tab_csv:
         file_name="sensor_readings_template.csv",
         mime="text/csv",
     )
+    st.caption("Including an `engine_id` column is optional — if present, it's read automatically instead of typing it.")
 
     uploaded_file = st.file_uploader("Sensor readings CSV", type=["csv"])
 
@@ -188,13 +188,35 @@ with tab_csv:
                     + ". Use the template above to check the exact column names."
                 )
             else:
-                st.success(f"Loaded {len(data)} cycle(s) for this engine.")
+                st.success(f"Loaded {len(data)} cycle(s).")
+
+                if "engine_id" in data.columns:
+                    detected_ids = data["engine_id"].dropna().unique()
+                    if len(detected_ids) > 1:
+                        st.warning(
+                            f"This CSV has {len(detected_ids)} different engine_id values "
+                            f"({', '.join(map(str, detected_ids))}). Using the last row's "
+                            "engine, since the models look at the most recent cycle."
+                        )
+                    engine_id = str(data["engine_id"].iloc[-1])
+                    st.info(f"Engine ID (from CSV): **{engine_id}**")
+                else:
+                    engine_id = st.text_input(
+                        "Engine ID (not found in CSV — enter manually)",
+                        value=f"{dataset}_1",
+                        key="csv_engine_id_fallback",
+                    )
+
                 st.dataframe(data.tail(10), use_container_width=True)
 
                 last_cycle = int(data["cycle"].max())
 
                 if st.button("🔍 Analyze Machine Health", type="primary", key="csv_analyze"):
-                    input_row = engineer_features(data)
+                    engine_data = data
+                    if "engine_id" in data.columns and len(data["engine_id"].dropna().unique()) > 1:
+                        engine_data = data[data["engine_id"] == engine_id]
+
+                    input_row = engineer_features(engine_data)
                     predicted_rul, predicted_risk, anomaly_status, anomaly_score = run_prediction(input_row)
                     show_results(
                         dataset, engine_id, last_cycle,
@@ -209,6 +231,7 @@ with tab_manual:
         "for a full, more accurate analysis."
     )
 
+    engine_id = st.text_input("Engine ID", value=f"{dataset}_1", key="manual_engine_id")
     cycle = st.number_input("Current Cycle", min_value=1, value=100, key="manual_cycle")
 
     sensor_values = {}
